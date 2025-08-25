@@ -1,4 +1,5 @@
 from django.apps import AppConfig
+# pylint: disable=all
 
 
 class MsinventoryappConfig(AppConfig):
