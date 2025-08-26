@@ -248,6 +248,26 @@ class StockMoveSerializer(serializers.ModelSerializer):
             'timestamp',
             'description'
         ]
+        
+    def validate(self, data):
+        move_type = data.get('move_type')
+        from_location = data.get('from_location')
+        to_location = data.get('to_location')
+        
+        if move_type:
+            if move_type.code == 'INBOUND' and from_location:
+                raise serializers.ValidationError({"from_location": "INBOUND moves should not have a from_location"})
+            
+            if move_type.code == 'OUTBOUND' and to_location:
+                raise serializers.ValidationError({"to_location": "OUTBOUND moves should not have a to_location"})
+            
+            if move_type.code == 'TRANSFER' and (not from_location or not to_location):
+                raise serializers.ValidationError({
+                    "from_location": "TRANSFER moves require a from_location",
+                    "to_location": "TRANSFER moves require a to_location"
+                })
+        
+        return data
 
 class InventoryLevelSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
