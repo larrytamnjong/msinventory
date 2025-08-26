@@ -158,40 +158,40 @@ class StockMoveType(models.Model):
         verbose_name_plural = "Stock Move Types"
 
 # Stock move model for inventory movements
-# Stock move model for inventory movements
 class StockMove(models.Model):
     move_type = models.ForeignKey(StockMoveType, on_delete=models.PROTECT)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField(validators=[MinValueValidator(1)])
-    from_location = models.ForeignKey(Location, on_delete=models.PROTECT, null=True, blank=True, related_name='outgoing_moves')
-    to_location = models.ForeignKey(Location, on_delete=models.PROTECT, null=True, blank=True, related_name='incoming_moves')
+    from_location = models.ForeignKey(
+        Location, on_delete=models.PROTECT, null=True, blank=True, related_name='outgoing_moves'
+    )
+    to_location = models.ForeignKey(
+        Location, on_delete=models.PROTECT, null=True, blank=True, related_name='incoming_moves'
+    )
     timestamp = models.DateTimeField(auto_now_add=True)
     description = models.TextField(blank=True)
-    
+
     def clean(self):
-        # Validation based on move type
+        """Validation rules based on move type"""
         if self.move_type.code == 'INBOUND' and self.from_location:
             raise ValidationError("INBOUND moves should not have a from_location")
         if self.move_type.code == 'OUTBOUND' and self.to_location:
             raise ValidationError("OUTBOUND moves should not have a to_location")
         if self.move_type.code == 'TRANSFER' and (not self.from_location or not self.to_location):
             raise ValidationError("TRANSFER moves require both from_location and to_location")
-    
+
     def save(self, *args, **kwargs):
-        self.full_clean()
-        
+        self.full_clean()  
         super().save(*args, **kwargs)
-        
         self.update_inventory()
-    
+
     def update_inventory(self):
-        from .models import InventoryLevel
-        
+        """Update inventory levels for each move type"""
         try:
             if self.move_type.code == 'INBOUND':
                 if not self.to_location:
                     raise ValueError("INBOUND moves require a to_location")
-                    
+
                 inventory, created = InventoryLevel.objects.get_or_create(
                     product=self.product,
                     location=self.to_location,
@@ -200,41 +200,35 @@ class StockMove(models.Model):
                 if not created:
                     inventory.quantity += self.quantity
                     inventory.save()
-                    
+
             elif self.move_type.code == 'OUTBOUND':
                 if not self.from_location:
                     raise ValueError("OUTBOUND moves require a from_location")
 
-                try:
-                    inventory = InventoryLevel.objects.get(
-                        product=self.product,
-                        location=self.from_location
-                    )
-                    if inventory.quantity < self.quantity:
-                        raise ValueError(f"Not enough stock available for {self.product.name} in {self.from_location.code}")
-                    
-                    inventory.quantity -= self.quantity
-                    inventory.save()
-                except InventoryLevel.DoesNotExist:
-                    raise ValueError(f"No inventory found for {self.product.name} in {self.from_location.code}")
-                    
+                inventory = InventoryLevel.objects.get(
+                    product=self.product,
+                    location=self.from_location
+                )
+                if inventory.quantity < self.quantity:
+                    raise ValueError(f"Not enough stock for {self.product} in {self.from_location.code}")
+
+                inventory.quantity -= self.quantity
+                inventory.save()
+
             elif self.move_type.code == 'TRANSFER':
                 if not self.from_location or not self.to_location:
                     raise ValueError("TRANSFER moves require both from_location and to_location")
-                
-                try:
-                    from_inventory = InventoryLevel.objects.get(
-                        product=self.product,
-                        location=self.from_location
-                    )
-                    if from_inventory.quantity < self.quantity:
-                        raise ValueError(f"Not enough stock available for {self.product.name} in {self.from_location.code}")
-                    
-                    from_inventory.quantity -= self.quantity
-                    from_inventory.save()
-                except InventoryLevel.DoesNotExist:
-                    raise ValueError(f"No inventory found for {self.product.name} in {self.from_location.code}")
-                
+
+                from_inventory = InventoryLevel.objects.get(
+                    product=self.product,
+                    location=self.from_location
+                )
+                if from_inventory.quantity < self.quantity:
+                    raise ValueError(f"Not enough stock for {self.product} in {self.from_location.code}")
+
+                from_inventory.quantity -= self.quantity
+                from_inventory.save()
+
                 to_inventory, created = InventoryLevel.objects.get_or_create(
                     product=self.product,
                     location=self.to_location,
@@ -243,98 +237,17 @@ class StockMove(models.Model):
                 if not created:
                     to_inventory.quantity += self.quantity
                     to_inventory.save()
-        
-        except Exception as e:
-            self.delete()
-            raise e
-    
+
+        except InventoryLevel.DoesNotExist:
+            raise ValueError(f"No inventory record found for {self.product} in source location.")
+
     def __str__(self):
-        return f"{self.move_type} - {self.product} - {self.quantity}"  
+        return f"{self.move_type} - {self.product} - {self.quantity}"
 
     class Meta:
         verbose_name = "Stock Move"
         verbose_name_plural = "Stock Moves"
-    move_type = models.ForeignKey(StockMoveType, on_delete=models.PROTECT)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.IntegerField(validators=[MinValueValidator(1)])
-    from_location = models.ForeignKey(Location, on_delete=models.PROTECT, null=True, blank=True, related_name='outgoing_moves')
-    to_location = models.ForeignKey(Location, on_delete=models.PROTECT, null=True, blank=True, related_name='incoming_moves')
-    timestamp = models.DateTimeField(auto_now_add=True)
-    description = models.TextField(blank=True)
-    
-    def clean(self):
-        # Validation based on move type
-        if self.move_type.code == 'INBOUND' and self.from_location:
-            raise ValidationError("INBOUND moves should not have a from_location")
-        if self.move_type.code == 'OUTBOUND' and self.to_location:
-            raise ValidationError("OUTBOUND moves should not have a to_location")
-        if self.move_type.code == 'TRANSFER' and (not self.from_location or not self.to_location):
-            raise ValidationError("TRANSFER moves require both from_location and to_location")
-    
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
-        
-        self.update_inventory()
-    
-    def update_inventory(self):
 
-        from .models import InventoryLevel
-        
-        if self.move_type.code == 'INBOUND':
-            inventory, created = InventoryLevel.objects.get_or_create(
-                product=self.product,
-                location=self.to_location,
-                defaults={'quantity': self.quantity}
-            )
-            if not created:
-                inventory.quantity += self.quantity
-                inventory.save()
-                
-        elif self.move_type.code == 'OUTBOUND':
-
-            try:
-                inventory = InventoryLevel.objects.get(
-                    product=self.product,
-                    location=self.from_location
-                )
-                if inventory.quantity < self.quantity:
-                    raise ValueError(f"Not enough stock available for {self.product.name} in {self.from_location.code}")
-                
-                inventory.quantity -= self.quantity
-                inventory.save()
-            except InventoryLevel.DoesNotExist:
-                raise ValueError(f"No inventory found for {self.product.name} in {self.from_location.code}")
-                
-        elif self.move_type.code == 'TRANSFER':
-            try:
-                from_inventory = InventoryLevel.objects.get(
-                    product=self.product,
-                    location=self.from_location
-                )
-                if from_inventory.quantity < self.quantity:
-                    raise ValueError(f"Not enough stock available for {self.product.name} in {self.from_location.code}")
-                
-                from_inventory.quantity -= self.quantity
-                from_inventory.save()
-            except InventoryLevel.DoesNotExist:
-                raise ValueError(f"No inventory found for {self.product.name} in {self.from_location.code}")
-            
-            to_inventory, created = InventoryLevel.objects.get_or_create(
-                product=self.product,
-                location=self.to_location,
-                defaults={'quantity': self.quantity}
-            )
-            if not created:
-                to_inventory.quantity += self.quantity
-                to_inventory.save()
-    
-    def __str__(self):
-        return f"{self.move_type} - {self.product} - {self.quantity}"  
-
-    class Meta:
-        verbose_name = "Stock Move"
-        verbose_name_plural = "Stock Moves"
 
 # Inventory level per product and location
 class InventoryLevel(models.Model):
