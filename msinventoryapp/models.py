@@ -10,7 +10,7 @@ class PriorityLevel(models.Model):
     description = models.TextField(blank=True)
     
     def __str__(self):
-        return str(self.name)  # Ensure we return a string
+        return str(self.name)  
 
     class Meta:
         verbose_name = "Priority Level"
