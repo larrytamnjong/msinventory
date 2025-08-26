@@ -7,3 +7,4 @@
 ### 4. Run the command ```python manage.py makemigrations```
 ### 5. Run the command ```python manage.py migrate```
 ### 6. Run the command ```python manage.py runserver```
+### 7. Run the command ```python manage.py createsuperuser```
