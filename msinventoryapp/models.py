@@ -93,9 +93,9 @@ class PurchaseOrderStatusType(models.Model):
 class Product(models.Model):
     favorite = models.ForeignKey(FavoriteType, on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=200)
-    internal_reference = models.CharField(max_length=100, unique=True)
+    internal_reference = models.CharField(max_length=100, null=True)
     responsible = models.CharField(max_length=100, blank=True, null=True)
-    barcode = models.CharField(max_length=100, blank=True)
+    barcode = models.CharField(max_length=100, blank=True, null=True)
     sales_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     cost = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     product_category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True)
